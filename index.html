@@ -1,0 +1,784 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulador de Tiro Parabólico con Resistencia del Aire</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0b1020, #171f3a);
+      color: #f5f5f5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+
+    #sidebar {
+      width: 360px;
+      padding: 16px;
+      background: rgba(10, 16, 35, 0.95);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #main {
+      flex: 1;
+      position: relative;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      font-size: 14px;
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
+
+    .control-group {
+      margin-bottom: 8px;
+    }
+
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .control-group input[type="range"] {
+      width: 100%;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .control-row input[type="number"] {
+      width: 80px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.3);
+      color: #f5f5f5;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    button {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+      background: #2b7bff;
+      color: white;
+      transition: transform 0.1s, box-shadow 0.1s, background 0.2s;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .info-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 10px;
+      padding: 8px;
+      font-size: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+      margin-bottom: 4px;
+    }
+
+    .info-label {
+      opacity: 0.75;
+    }
+
+    .info-value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 14px;
+      background: #000;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6);
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* LEYENDA: ahora abajo a la derecha para no tapar créditos */
+    .legend {
+      position: absolute;
+      bottom: 24px;   /* antes estaba top: 24px */
+      right: 24px;
+      top: auto;      /* anulamos el top */
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 5;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .legend-color.trayectoria { background: #2b7bff; }
+    .legend-color.velocidad { background: #00ffb7; }
+    .legend-color.aceleracion { background: #ff5b5b; }
+
+    /* Panel flotante sobre el escenario */
+    #overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 340px;
+      background: rgba(5, 10, 25, 0.8);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(10px);
+      padding: 8px;
+      z-index: 20;
+    }
+
+    #overlay-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+
+    .overlay-tab {
+      flex: 1;
+      font-size: 11px;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: rgba(255,255,255,0.05);
+      color: #d0d7ff;
+      white-space: nowrap;
+    }
+
+    .overlay-tab.active {
+      background: rgba(43,123,255,0.8);
+      color: #fff;
+    }
+
+    .overlay-panel {
+      font-size: 11px;
+      max-height: 140px;
+      overflow: auto;
+    }
+
+    .overlay-panel ul {
+      margin-left: 16px;
+      margin-top: 4px;
+    }
+
+    .overlay-panel p {
+      margin-top: 2px;
+      margin-bottom: 2px;
+    }
+
+    .overlay-panel.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="sidebar">
+    <div>
+      <h1>Tiro parabólico con aire</h1>
+      <h2>Simulador interactivo estilo PhET</h2>
+    </div>
+
+    <!-- Controles -->
+    <div class="control-group">
+      <label>
+        <span>Ángulo (°)</span>
+        <span id="angle-value">45</span>
+      </label>
+      <div class="control-row">
+        <input id="angle" type="range" min="5" max="85" value="45">
+        <input id="angle-input" type="number" min="5" max="85" value="45">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <span>Velocidad inicial (m/s)</span>
+        <span id="speed-value">20</span>
+      </label>
+      <div class="control-row">
+        <input id="speed" type="range" min="5" max="60" value="20">
+        <input id="speed-input" type="number" min="5" max="60" value="20">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <span>Masa (kg)</span>
+        <span id="mass-value">1.0</span>
+      </label>
+      <div class="control-row">
+        <input id="mass" type="range" min="0.2" max="5" step="0.1" value="1.0">
+        <input id="mass-input" type="number" min="0.2" max="5" step="0.1" value="1.0">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <span>Coeficiente de arrastre</span>
+        <span id="drag-value">0.10</span>
+      </label>
+      <div class="control-row">
+        <input id="drag" type="range" min="0" max="1" step="0.02" value="0.10">
+        <input id="drag-input" type="number" min="0" max="1" step="0.02" value="0.10">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <span>Δt (s)</span>
+        <span id="dt-value">0.01</span>
+      </label>
+      <div class="control-row">
+        <input id="dt" type="range" min="0.002" max="0.04" step="0.002" value="0.01">
+        <input id="dt-input" type="number" min="0.002" max="0.04" step="0.002" value="0.01">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button id="start-btn">Iniciar</button>
+      <button id="reset-btn" class="secondary">Reiniciar</button>
+    </div>
+
+    <!-- Panel de info numérica -->
+    <div class="info-panel">
+      <div class="info-label">Tiempo</div>
+      <div class="info-value" id="info-t">0.00 s</div>
+      <div class="info-label">Posición</div>
+      <div class="info-value" id="info-pos">0.00 m, 1.30 m</div>
+      <div class="info-label">Velocidad</div>
+      <div class="info-value" id="info-vel">0.00 m/s</div>
+      <div class="info-label">Energía total</div>
+      <div class="info-value" id="info-et">0.00 J</div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="canvas-container">
+      <canvas id="scene"></canvas>
+    </div>
+
+    <!-- Panel flotante de pestañas sobre el escenario -->
+    <div id="overlay">
+      <div id="overlay-tabs">
+        <button class="overlay-tab active" data-tab="intro">Instrucciones</button>
+        <button class="overlay-tab" data-tab="vars">Variables</button>
+        <button class="overlay-tab" data-tab="eqs">Ecuaciones</button>
+        <button class="overlay-tab" data-tab="res">Resultados</button>
+        <button class="overlay-tab" data-tab="fen">Fenómeno</button>
+        <button class="overlay-tab" data-tab="cred">Créditos</button>
+      </div>
+
+      <div class="overlay-panel" id="panel-intro">
+        <p><b>¿Cómo usar?</b></p>
+        <ul>
+          <li>Ajusta ángulo, velocidad, masa y arrastre con los deslizadores.</li>
+          <li>Haz clic en <b>Iniciar</b> para lanzar la pelota.</li>
+          <li>Observa la trayectoria azul y los vectores de velocidad (verde) y aceleración (rojo).</li>
+          <li>Cambia el coeficiente de arrastre para ver cómo el aire acorta el alcance.</li>
+          <li>Con <b>Reiniciar</b> vuelves al inicio y puedes probar otros valores.</li>
+        </ul>
+      </div>
+
+      <div class="overlay-panel hidden" id="panel-vars">
+        <p><b>Variables controlables</b></p>
+        <ul>
+          <li><b>Ángulo (θ):</b> inclinación del lanzamiento respecto al suelo.</li>
+          <li><b>Velocidad inicial (v₀):</b> rapidez de la pelota al salir de la mano.</li>
+          <li><b>Masa (m):</b> masa de la pelota; influye en cómo la frena el aire.</li>
+          <li><b>Coef. de arrastre (c):</b> mide la intensidad de la resistencia del aire.</li>
+          <li><b>Δt:</b> tamaño del paso de tiempo para el método numérico.</li>
+        </ul>
+      </div>
+
+      <div class="overlay-panel hidden" id="panel-eqs">
+        <p><b>Modelo físico</b></p>
+        <p>Fuerzas:</p>
+        <p>F = m·a = −m·g·ŷ − c·v·|v|</p>
+        <p>Aceleraciones:</p>
+        <p>aₓ = −(c/m)·vₓ·√(vₓ² + vᵧ²)</p>
+        <p>aᵧ = −g − (c/m)·vᵧ·√(vₓ² + vᵧ²)</p>
+        <p>Método de Euler:</p>
+        <p>v(t + Δt) = v(t) + a·Δt</p>
+        <p>r(t + Δt) = r(t) + v(t)·Δt</p>
+      </div>
+
+      <div class="overlay-panel hidden" id="panel-res">
+        <p><b>Resultados numéricos</b></p>
+        <ul>
+          <li><b>Altura máxima:</b> <span id="res-altura">0.00 m</span></li>
+          <li><b>Alcance horizontal:</b> <span id="res-alcance">0.00 m</span></li>
+          <li><b>Tiempo de vuelo:</b> <span id="res-tiempo">0.00 s</span></li>
+        </ul>
+        <p style="margin-top:6px;">
+          Los valores se actualizan automáticamente cuando la pelota vuelve al césped.
+        </p>
+      </div>
+
+      <div class="overlay-panel hidden" id="panel-fen">
+        <p><b>Descripción del fenómeno</b></p>
+        <p>
+          El tiro parabólico describe el movimiento de un objeto lanzado en dos dimensiones bajo la acción de la gravedad.
+          Sin aire la trayectoria es una parábola simétrica. Al incluir la resistencia del aire, la curva se deforma:
+          la pelota alcanza menos altura, menos alcance y pierde energía mecánica a lo largo del recorrido.
+        </p>
+        <p style="margin-top:4px;">
+          Este simulador representa a un niño lanzando una pelota en un campo abierto y permite explorar cómo el ángulo,
+          la velocidad inicial y el coeficiente de arrastre modifican el resultado del lanzamiento.
+        </p>
+      </div>
+
+      <div class="overlay-panel hidden" id="panel-cred">
+        <p><b>Créditos</b></p>
+
+        <p><b>Integrantes y código</b></p>
+        <ul>
+          <li>Yessica Dayana Pulido Oñate – 20251107030</li>
+          <li>Wayra Krupskaia Betancourt Medellín – 20251107034</li>
+          <li>Angel Santiago Rivera Arévalo – 20251107008</li>
+          <li>Joshua Esteban Garzón Marín – 20251107004</li>
+        </ul>
+
+        <p style="margin-top:6px;">
+          <b>Institución:</b> Universidad Distrital
+        </p>
+        <p>
+          <b>Materia:</b> Elementos computacionales
+        </p>
+      </div>
+    </div>
+
+    <!-- Leyenda de vectores -->
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color trayectoria"></div><span>Trayectoria</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color velocidad"></div><span>Vector velocidad</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color aceleracion"></div><span>Vector aceleración</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Constantes físicas
+  const G = 9.81;
+  const launchHeight = 2.50; // altura aproximada de la mano del niño (m)
+
+  // Estado de la simulación
+  let angle = 45 * Math.PI / 180;
+  let speed0 = 20;
+  let mass = 1.0;
+  let drag = 0.1;
+  let dt = 0.01;
+
+  let t = 0;
+  let x = 0;
+  let y = launchHeight;
+  let vx = 0;
+  let vy = 0;
+  let running = false;
+
+  const trail = [];
+
+  // Resultados globales
+  let maxHeight = launchHeight;
+  let rangeX = 0;
+  let flightTime = 0;
+
+  // Imagen de fondo
+  const bgImage = new Image();
+  let bgLoaded = false;
+  bgImage.src = "fondo_nino.png";
+  bgImage.onload = () => { bgLoaded = true; };
+
+  // Canvas y contexto
+  const canvas = document.getElementById("scene");
+  const ctx = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  // UI elements
+  const angleSlider = document.getElementById("angle");
+  const angleInput = document.getElementById("angle-input");
+  const speedSlider = document.getElementById("speed");
+  const speedInput = document.getElementById("speed-input");
+  const massSlider = document.getElementById("mass");
+  const massInput = document.getElementById("mass-input");
+  const dragSlider = document.getElementById("drag");
+  const dragInput = document.getElementById("drag-input");
+  const dtSlider = document.getElementById("dt");
+  const dtInput = document.getElementById("dt-input");
+
+  const angleValue = document.getElementById("angle-value");
+  const speedValue = document.getElementById("speed-value");
+  const massValue = document.getElementById("mass-value");
+  const dragValue = document.getElementById("drag-value");
+  const dtValue = document.getElementById("dt-value");
+
+  const infoT = document.getElementById("info-t");
+  const infoPos = document.getElementById("info-pos");
+  const infoVel = document.getElementById("info-vel");
+  const infoEt = document.getElementById("info-et");
+
+  const startBtn = document.getElementById("start-btn");
+  const resetBtn = document.getElementById("reset-btn");
+
+  const resAltura = document.getElementById("res-altura");
+  const resAlcance = document.getElementById("res-alcance");
+  const resTiempo = document.getElementById("res-tiempo");
+
+  // Tabs overlay
+  const overlayTabs = document.querySelectorAll(".overlay-tab");
+  const overlayPanels = {
+    intro: document.getElementById("panel-intro"),
+    vars: document.getElementById("panel-vars"),
+    eqs: document.getElementById("panel-eqs"),
+    res: document.getElementById("panel-res"),
+    fen: document.getElementById("panel-fen"),
+    cred: document.getElementById("panel-cred")
+  };
+
+  overlayTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const tabId = tab.dataset.tab;
+      overlayTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      Object.keys(overlayPanels).forEach(k => {
+        overlayPanels[k].classList.add("hidden");
+      });
+      overlayPanels[tabId].classList.remove("hidden");
+    });
+  });
+
+  function linkSliderInput(slider, input, callback) {
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+      callback(parseFloat(slider.value));
+      updateLabels();
+    });
+    input.addEventListener("change", () => {
+      slider.value = input.value;
+      callback(parseFloat(input.value));
+      updateLabels();
+    });
+  }
+
+  linkSliderInput(angleSlider, angleInput, v => angle = v * Math.PI / 180);
+  linkSliderInput(speedSlider, speedInput, v => speed0 = v);
+  linkSliderInput(massSlider, massInput, v => mass = v);
+  linkSliderInput(dragSlider, dragInput, v => drag = v);
+  linkSliderInput(dtSlider, dtInput, v => dt = v);
+
+  function updateLabels() {
+    angleValue.textContent = angleInput.value;
+    speedValue.textContent = speedInput.value;
+    massValue.textContent = parseFloat(massInput.value).toFixed(1);
+    dragValue.textContent = parseFloat(dragInput.value).toFixed(2);
+    dtValue.textContent = parseFloat(dtInput.value).toFixed(3);
+  }
+  updateLabels();
+
+  // Resetear simulación
+  function resetSimulation() {
+    t = 0;
+    x = 0;
+    y = launchHeight;
+
+    const angDeg = parseFloat(angleInput.value);
+    angle = angDeg * Math.PI / 180;
+    speed0 = parseFloat(speedInput.value);
+    mass = parseFloat(massInput.value);
+    drag = parseFloat(dragInput.value);
+    dt = parseFloat(dtInput.value);
+
+    vx = speed0 * Math.cos(angle);
+    vy = speed0 * Math.sin(angle);
+    trail.length = 0;
+    running = false;
+
+    maxHeight = launchHeight;
+    rangeX = 0;
+    flightTime = 0;
+    updateResultsPanel();
+
+    startBtn.textContent = "Iniciar";
+    updateInfo();
+    drawScene();
+  }
+
+  function updateInfo() {
+    const v = Math.sqrt(vx * vx + vy * vy);
+    const Ec = 0.5 * mass * v * v;
+    const Ep = mass * G * y;
+    const Et = Ec + Ep;
+
+    infoT.textContent = t.toFixed(2) + " s";
+    infoPos.textContent = `${x.toFixed(2)} m, ${y.toFixed(2)} m`;
+    infoVel.textContent = v.toFixed(2) + " m/s";
+    infoEt.textContent = Et.toFixed(2) + " J";
+  }
+
+  function updateResultsPanel() {
+    resAltura.textContent = maxHeight.toFixed(2) + " m";
+    resAlcance.textContent = rangeX.toFixed(2) + " m";
+    resTiempo.textContent = flightTime.toFixed(2) + " s";
+  }
+
+  function stepSimulation() {
+    const v = Math.sqrt(vx * vx + vy * vy);
+    let ax = 0;
+    let ay = -G;
+    if (v > 0) {
+      ax = -(drag / mass) * vx * v;
+      ay = -G - (drag / mass) * vy * v;
+    }
+
+    vx += ax * dt;
+    vy += ay * dt;
+    x += vx * dt;
+    y += vy * dt;
+    t += dt;
+
+    if (y > maxHeight) maxHeight = y;
+
+    if (y <= 0 && t > 0) {
+      y = 0;
+      running = false;
+      startBtn.textContent = "Iniciar";
+      rangeX = x;
+      flightTime = t;
+      updateResultsPanel();
+    }
+
+    trail.push({x, y});
+    if (trail.length > 800) trail.shift();
+
+    updateInfo();
+  }
+
+  // Conversión mundo → pantalla
+  // Estos márgenes colocan el origen (x=0, y=0) cerca del niño.
+  function worldToScreen(wx, wy, width, height, maxX, maxY) {
+    const marginLeft = 160;  // mueve todo hacia la derecha (mano del niño)
+    const marginBottom = 90; // sube o baja la pelota respecto al suelo
+    const marginRight = 30;
+    const marginTop = 40;
+
+    const sx = marginLeft + (wx / maxX) * (width - marginLeft - marginRight);
+    const sy = height - marginBottom - (wy / maxY) * (height - marginTop - marginBottom);
+    return [sx, sy];
+  }
+
+  function drawScene() {
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (bgLoaded) {
+      ctx.drawImage(bgImage, 0, 0, w, h);
+    } else {
+      const grad = ctx.createRadialGradient(w * 0.3, h * 0.1, 50, w * 0.5, h * 0.7, Math.max(w, h));
+      grad.addColorStop(0, "#223b70");
+      grad.addColorStop(1, "#050814");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    let maxX = 40;
+    let maxY = 20;
+    trail.forEach(p => {
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    });
+    maxX = Math.max(maxX, 20);
+    maxY = Math.max(maxY, 10);
+
+    // línea de suelo
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const [gx1, gy] = worldToScreen(0, 0, w, h, maxX, maxY);
+    const [gx2, gy2] = worldToScreen(maxX * 1.05, 0, w, h, maxX, maxY);
+    ctx.moveTo(gx1, gy);
+    ctx.lineTo(gx2, gy2);
+    ctx.stroke();
+
+    // trayectoria
+    if (trail.length > 1) {
+      ctx.strokeStyle = "#2b7bff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < trail.length; i++) {
+        const [sx, sy] = worldToScreen(trail[i].x, trail[i].y, w, h, maxX, maxY);
+        if (i === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+    }
+
+    // pelota
+    const [px, py] = worldToScreen(x, y, w, h, maxX, maxY);
+    const speed = Math.sqrt(vx * vx + vy * vy);
+
+    const glow = Math.min(10 + speed * 0.3, 30);
+    const gradBall = ctx.createRadialGradient(px - 2, py - 2, 1, px, py, glow);
+    gradBall.addColorStop(0, "#ffffff");
+    gradBall.addColorStop(0.3, "#ffeeaa");
+    gradBall.addColorStop(1, "#ff7b2b");
+    ctx.fillStyle = gradBall;
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // vector velocidad
+    const vScale = 0.12;
+    const vxPix = vx * vScale * (w / maxX);
+    const vyPix = -vy * vScale * (h / maxY);
+    drawArrow(px, py, px + vxPix, py + vyPix, "#00ffb7");
+
+    // vector aceleración
+    const v = Math.sqrt(vx * vx + vy * vy);
+    let ax = 0, ay = -G;
+    if (v > 0) {
+      ax = -(drag / mass) * vx * v;
+      ay = -G - (drag / mass) * vy * v;
+    }
+    const aScale = 0.3;
+    const axPix = ax * aScale * (w / maxX);
+    const ayPix = -ay * aScale * (h / maxY);
+    drawArrow(px, py, px + axPix, py + ayPix, "#ff5b5b");
+  }
+
+  function drawArrow(x1, y1, x2, y2, color) {
+    const headLength = 10;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const angle = Math.atan2(dy, dx);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(
+      x2 - headLength * Math.cos(angle - Math.PI / 6),
+      y2 - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      x2 - headLength * Math.cos(angle + Math.PI / 6),
+      y2 - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function loop() {
+    if (running) {
+      stepSimulation();
+    }
+    drawScene();
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener("click", () => {
+    if (!running) {
+      running = true;
+      startBtn.textContent = "Pausar";
+    } else {
+      running = false;
+      startBtn.textContent = "Reanudar";
+    }
+  });
+
+  resetBtn.addEventListener("click", () => {
+    resetSimulation();
+  });
+
+  resetSimulation();
+  loop();
+</script>
+</body>
+</html>
