@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -151,9 +150,9 @@
     /* LEYENDA: ahora abajo a la derecha para no tapar créditos */
     .legend {
       position: absolute;
-      bottom: 24px;   /* antes estaba top: 24px */
+      bottom: 24px;
       right: 24px;
-      top: auto;      /* anulamos el top */
+      top: auto;
       font-size: 11px;
       padding: 6px 8px;
       border-radius: 8px;
@@ -302,9 +301,11 @@
       </div>
     </div>
 
+    <!-- Botones -->
     <div class="buttons">
       <button id="start-btn">Iniciar</button>
       <button id="reset-btn" class="secondary">Reiniciar</button>
+      <button id="download-btn" class="secondary">Exportar CSV</button>
     </div>
 
     <!-- Panel de info numérica -->
@@ -498,6 +499,7 @@
 
   const startBtn = document.getElementById("start-btn");
   const resetBtn = document.getElementById("reset-btn");
+  const downloadBtn = document.getElementById("download-btn");
 
   const resAltura = document.getElementById("res-altura");
   const resAlcance = document.getElementById("res-alcance");
@@ -626,7 +628,8 @@
       updateResultsPanel();
     }
 
-    trail.push({x, y});
+    // Guardamos también t, vx y vy para el CSV
+    trail.push({ t, x, y, vx, vy });
     if (trail.length > 800) trail.shift();
 
     updateInfo();
@@ -754,6 +757,27 @@
     ctx.closePath();
     ctx.fill();
   }
+
+  // Exportar datos a CSV
+  downloadBtn.addEventListener("click", () => {
+    if (trail.length === 0) {
+      alert("Aún no hay datos. Ejecuta la simulación primero.");
+      return;
+    }
+
+    let csv = "tiempo,x,y,vx,vy\n";
+    for (const p of trail) {
+      csv += `${p.t.toFixed(3)},${p.x.toFixed(3)},${p.y.toFixed(3)},${p.vx.toFixed(3)},${p.vy.toFixed(3)}\n`;
+    }
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resultados_simulacion.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 
   function loop() {
     if (running) {
