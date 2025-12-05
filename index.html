@@ -71,13 +71,18 @@
       align-items: center;
     }
 
-    .control-row input[type="number"] {
-      width: 80px;
+    .control-row input[type="number"],
+    .control-row select {
+      width: 100%;
       padding: 2px 4px;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.15);
       background: rgba(0, 0, 0, 0.3);
       color: #f5f5f5;
+    }
+
+    .control-row input[type="number"] {
+      width: 80px;
     }
 
     .buttons {
@@ -134,6 +139,30 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .energy-table-wrapper {
+      grid-column: 1 / span 2;
+      margin-top: 4px;
+      max-height: 90px;
+      overflow: auto;
+    }
+
+    #energy-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+
+    #energy-table th,
+    #energy-table td {
+      padding: 2px 4px;
+    }
+
+    #energy-table thead {
+      position: sticky;
+      top: 0;
+      background: rgba(0, 0, 0, 0.6);
+    }
+
     canvas {
       width: 100%;
       height: 100%;
@@ -147,7 +176,7 @@
       height: 100%;
     }
 
-    /* LEYENDA: ahora abajo a la derecha para no tapar créditos */
+    /* LEYENDA: abajo a la derecha */
     .legend {
       position: absolute;
       bottom: 24px;
@@ -178,6 +207,8 @@
     .legend-color.trayectoria { background: #2b7bff; }
     .legend-color.velocidad { background: #00ffb7; }
     .legend-color.aceleracion { background: #ff5b5b; }
+    .legend-color.ec { background: #ffd700; }
+    .legend-color.ep { background: #9b59b6; }
 
     /* Panel flotante sobre el escenario */
     #overlay {
@@ -235,6 +266,32 @@
     .overlay-panel.hidden {
       display: none;
     }
+
+    .overlay-close {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: #d0d7ff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .overlay-toggle {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(5, 10, 25, 0.8);
+      color: #d0d7ff;
+      cursor: pointer;
+      z-index: 10;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -259,7 +316,7 @@
 
     <div class="control-group">
       <label>
-        <span>Velocidad inicial (m/s)</span>
+        <span>Velocidad inicial |<b>v₀</b>| (m/s)</span>
         <span id="speed-value">20</span>
       </label>
       <div class="control-row">
@@ -290,6 +347,23 @@
       </div>
     </div>
 
+    <!-- Selección de medio -->
+    <div class="control-group">
+      <label>
+        <span>Medio</span>
+        <span></span>
+      </label>
+      <div class="control-row">
+        <select id="medium-select">
+          <option value="custom">Personalizado</option>
+          <option value="0">Vacío (c = 0)</option>
+          <option value="0.10" selected>Aire (c ≈ 0,10)</option>
+          <option value="0.40">Agua (c ≈ 0,40)</option>
+          <option value="0.80">Miel (c ≈ 0,80)</option>
+        </select>
+      </div>
+    </div>
+
     <div class="control-group">
       <label>
         <span>Δt (s)</span>
@@ -308,16 +382,39 @@
       <button id="download-btn" class="secondary">Exportar CSV</button>
     </div>
 
-    <!-- Panel de info numérica -->
+    <!-- Panel de info numérica + tabla de energía -->
     <div class="info-panel">
       <div class="info-label">Tiempo</div>
       <div class="info-value" id="info-t">0.00 s</div>
-      <div class="info-label">Posición</div>
-      <div class="info-value" id="info-pos">0.00 m, 1.30 m</div>
+
+      <div class="info-label">Posición (x, y)</div>
+      <div class="info-value" id="info-pos">x = 0.00 m, y = 0.00 m</div>
+
       <div class="info-label">Velocidad</div>
-      <div class="info-value" id="info-vel">0.00 m/s</div>
+      <div class="info-value" id="info-vel">|v| = 0.00 m/s (vₓ = 0.00, vᵧ = 0.00)</div>
+
+      <div class="info-label">Energía cinética</div>
+      <div class="info-value" id="info-ec">0.00 J</div>
+
+      <div class="info-label">Energía potencial</div>
+      <div class="info-value" id="info-ep">0.00 J</div>
+
       <div class="info-label">Energía total</div>
       <div class="info-value" id="info-et">0.00 J</div>
+
+      <div class="energy-table-wrapper">
+        <table id="energy-table">
+          <thead>
+          <tr>
+            <th>t (s)</th>
+            <th>E<sub>c</sub> (J)</th>
+            <th>E<sub>p</sub> (J)</th>
+            <th>E<sub>t</sub> (J)</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -326,8 +423,13 @@
       <canvas id="scene"></canvas>
     </div>
 
+    <!-- Botón para volver a abrir el panel -->
+    <button id="overlay-toggle" class="overlay-toggle">?</button>
+
     <!-- Panel flotante de pestañas sobre el escenario -->
     <div id="overlay">
+      <button id="overlay-close" class="overlay-close">×</button>
+
       <div id="overlay-tabs">
         <button class="overlay-tab active" data-tab="intro">Instrucciones</button>
         <button class="overlay-tab" data-tab="vars">Variables</button>
@@ -340,59 +442,106 @@
       <div class="overlay-panel" id="panel-intro">
         <p><b>¿Cómo usar?</b></p>
         <ul>
-          <li>Ajusta ángulo, velocidad, masa y arrastre con los deslizadores.</li>
+          <li>Ajusta ángulo, velocidad, masa y arrastre con los deslizadores o el menú de medio.</li>
           <li>Haz clic en <b>Iniciar</b> para lanzar la pelota.</li>
-          <li>Observa la trayectoria azul y los vectores de velocidad (verde) y aceleración (rojo).</li>
-          <li>Cambia el coeficiente de arrastre para ver cómo el aire acorta el alcance.</li>
-          <li>Con <b>Reiniciar</b> vuelves al inicio y puedes probar otros valores.</li>
+          <li>Observa la trayectoria azul, los vectores de velocidad (verde) y aceleración (rojo).</li>
+          <li>Observa también los vectores de energía cinética (amarillo) y potencial (morado).</li>
+          <li>Explora la energía cinética y potencial en la tabla de energía.</li>
+          <li>Con <b>Exportar CSV</b> puedes guardar los datos de la trayectoria.</li>
         </ul>
       </div>
 
       <div class="overlay-panel hidden" id="panel-vars">
         <p><b>Variables controlables</b></p>
         <ul>
-          <li><b>Ángulo (θ):</b> inclinación del lanzamiento respecto al suelo.</li>
-          <li><b>Velocidad inicial (v₀):</b> rapidez de la pelota al salir de la mano.</li>
-          <li><b>Masa (m):</b> masa de la pelota; influye en cómo la frena el aire.</li>
-          <li><b>Coef. de arrastre (c):</b> mide la intensidad de la resistencia del aire.</li>
+          <li><b>Ángulo (θ):</b> inclinación del lanzamiento respecto al eje x.</li>
+          <li><b>Velocidad inicial |v₀|:</b> módulo de la velocidad inicial.</li>
+          <li><b>Masa (m):</b> masa de la pelota.</li>
+          <li><b>Coef. de arrastre (c):</b> intensidad de la resistencia del medio.</li>
+          <li><b>Medio:</b> vacío, aire, agua o miel.</li>
           <li><b>Δt:</b> tamaño del paso de tiempo para el método numérico.</li>
         </ul>
       </div>
 
       <div class="overlay-panel hidden" id="panel-eqs">
-        <p><b>Modelo físico</b></p>
-        <p>Fuerzas:</p>
-        <p>F = m·a = −m·g·ŷ − c·v·|v|</p>
-        <p>Aceleraciones:</p>
-        <p>aₓ = −(c/m)·vₓ·√(vₓ² + vᵧ²)</p>
-        <p>aᵧ = −g − (c/m)·vᵧ·√(vₓ² + vᵧ²)</p>
-        <p>Método de Euler:</p>
-        <p>v(t + Δt) = v(t) + a·Δt</p>
-        <p>r(t + Δt) = r(t) + v(t)·Δt</p>
+        <p><b>Modelo en componentes escalares</b></p>
+
+        <p><b>Descomposición de la velocidad inicial</b></p>
+        <p>v₀ₓ = |v₀| · cos θ</p>
+        <p>v₀ᵧ = |v₀| · sin θ</p>
+
+        <p style="margin-top:4px;"><b>Fuerzas y aceleraciones</b></p>
+        <p>La gravedad actúa hacia abajo con aceleración:</p>
+        <p>a<sub>g</sub> = −g</p>
+
+        <p>La fuerza de arrastre depende de la velocidad:</p>
+        <p>F<sub>arr</sub> = −c · |v| · v</p>
+        <p>donde |v| = √(vₓ² + vᵧ²).</p>
+
+        <p>En componentes:</p>
+        <p>aₓ = −(c/m) · vₓ · |v|</p>
+        <p>aᵧ = −g − (c/m) · vᵧ · |v|</p>
+
+        <p style="margin-top:4px;"><b>Evolución temporal (método de Euler)</b></p>
+        <p>vₓ(t + Δt) = vₓ(t) + aₓ · Δt</p>
+        <p>vᵧ(t + Δt) = vᵧ(t) + aᵧ · Δt</p>
+        <p>x(t + Δt) = x(t) + vₓ(t) · Δt</p>
+        <p>y(t + Δt) = y(t) + vᵧ(t) · Δt</p>
+
+        <p style="margin-top:4px;"><b>Energías mecánicas</b></p>
+        <p>E<sub>c</sub> = ½ · m · |v|²</p>
+        <p>E<sub>p</sub> = m · g · y</p>
+        <p>E<sub>t</sub> = E<sub>c</sub> + E<sub>p</sub></p>
       </div>
 
       <div class="overlay-panel hidden" id="panel-res">
         <p><b>Resultados numéricos</b></p>
         <ul>
-          <li><b>Altura máxima:</b> <span id="res-altura">0.00 m</span></li>
+          <li><b>Altura máxima (respecto a la mano):</b> <span id="res-altura">0.00 m</span></li>
           <li><b>Alcance horizontal:</b> <span id="res-alcance">0.00 m</span></li>
           <li><b>Tiempo de vuelo:</b> <span id="res-tiempo">0.00 s</span></li>
         </ul>
-        <p style="margin-top:6px;">
-          Los valores se actualizan automáticamente cuando la pelota vuelve al césped.
-        </p>
+
+        <div class="control-group" style="margin-top:6px;">
+          <label style="display:flex;justify-content:space-between;font-size:11px;">
+            <span>Línea de tiempo del lanzamiento</span>
+            <span id="res-progreso-label">0.00 s</span>
+          </label>
+          <input type="range" id="res-progreso" min="0" max="1" value="0" step="0.01">
+        </div>
       </div>
 
       <div class="overlay-panel hidden" id="panel-fen">
         <p><b>Descripción del fenómeno</b></p>
         <p>
-          El tiro parabólico describe el movimiento de un objeto lanzado en dos dimensiones bajo la acción de la gravedad.
-          Sin aire la trayectoria es una parábola simétrica. Al incluir la resistencia del aire, la curva se deforma:
-          la pelota alcanza menos altura, menos alcance y pierde energía mecánica a lo largo del recorrido.
+          El tiro parabólico describe el movimiento de un objeto lanzado bajo la acción de la gravedad
+          en dos dimensiones. En este simulador, el eje de referencia se toma en la mano del niño:
+          el punto donde sale la pelota es (x = 0, y = 0). El suelo corresponde a y = −h, donde h es
+          la altura de la mano respecto al piso.
         </p>
-        <p style="margin-top:4px;">
-          Este simulador representa a un niño lanzando una pelota en un campo abierto y permite explorar cómo el ángulo,
-          la velocidad inicial y el coeficiente de arrastre modifican el resultado del lanzamiento.
+        <p>
+          Sin resistencia del aire (c = 0), la trayectoria en el plano x–y es una parábola: la aceleración
+          en x es prácticamente nula y en y es constante e igual a −g. El movimiento se puede descomponer en:
+        </p>
+        <ul>
+          <li>Movimiento horizontal con velocidad casi constante vₓ.</li>
+          <li>Movimiento vertical uniformemente acelerado por la gravedad (vᵧ y y cambian con el tiempo).</li>
+        </ul>
+        <p>
+          Cuando se introduce el término de arrastre (c &gt; 0), la fuerza de rozamiento se opone a la
+          velocidad y depende de su módulo. Esto provoca que:
+        </p>
+        <ul>
+          <li>La velocidad horizontal vₓ disminuya con el tiempo.</li>
+          <li>La altura máxima sea menor que en el caso sin aire.</li>
+          <li>El alcance horizontal también se reduzca.</li>
+        </ul>
+        <p>
+          Desde el punto de vista energético, la pelota intercambia continuamente
+          <b>energía cinética</b> (asociada a la rapidez) y <b>energía potencial gravitatoria</b>
+          (asociada a la altura). En ausencia de rozamiento, la energía mecánica total
+          se conserva. Con resistencia del aire, parte de esa energía se disipa en forma de calor,
+          por eso la energía total va disminuyendo a lo largo de la trayectoria.
         </p>
       </div>
 
@@ -416,7 +565,7 @@
       </div>
     </div>
 
-    <!-- Leyenda de vectores -->
+    <!-- Leyenda de vectores y energías -->
     <div class="legend">
       <div class="legend-item">
         <div class="legend-color trayectoria"></div><span>Trayectoria</span>
@@ -427,6 +576,12 @@
       <div class="legend-item">
         <div class="legend-color aceleracion"></div><span>Vector aceleración</span>
       </div>
+      <div class="legend-item">
+        <div class="legend-color ec"></div><span>Energía cinética</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color ep"></div><span>Energía potencial</span>
+      </div>
     </div>
   </div>
 </div>
@@ -434,9 +589,9 @@
 <script>
   // Constantes físicas
   const G = 9.81;
-  const launchHeight = 2.50; // altura aproximada de la mano del niño (m)
+  const launchHeight = 2.50; // altura de la mano del niño sobre el suelo (m)
 
-  // Estado de la simulación
+  // Estado de la simulación (eje vertical con origen en la mano)
   let angle = 45 * Math.PI / 180;
   let speed0 = 20;
   let mass = 1.0;
@@ -445,17 +600,22 @@
 
   let t = 0;
   let x = 0;
-  let y = launchHeight;
+  let y = 0;      // y = 0 en la mano del niño
   let vx = 0;
   let vy = 0;
   let running = false;
 
-  const trail = [];
+  const trail = [];           // trayectoria con y medida desde la mano (origen)
+  const energyHistory = [];   // historial de energías
 
   // Resultados globales
-  let maxHeight = launchHeight;
+  let maxHeight = 0; // respecto a la mano
   let rangeX = 0;
   let flightTime = 0;
+
+  // Máximos de energía para escalar los vectores
+  let maxEcSeen = 1;
+  let maxEpSeen = 1;
 
   // Imagen de fondo
   const bgImage = new Image();
@@ -485,6 +645,7 @@
   const dragInput = document.getElementById("drag-input");
   const dtSlider = document.getElementById("dt");
   const dtInput = document.getElementById("dt-input");
+  const mediumSelect = document.getElementById("medium-select");
 
   const angleValue = document.getElementById("angle-value");
   const speedValue = document.getElementById("speed-value");
@@ -495,6 +656,8 @@
   const infoT = document.getElementById("info-t");
   const infoPos = document.getElementById("info-pos");
   const infoVel = document.getElementById("info-vel");
+  const infoEc = document.getElementById("info-ec");
+  const infoEp = document.getElementById("info-ep");
   const infoEt = document.getElementById("info-et");
 
   const startBtn = document.getElementById("start-btn");
@@ -505,7 +668,9 @@
   const resAlcance = document.getElementById("res-alcance");
   const resTiempo = document.getElementById("res-tiempo");
 
-  // Tabs overlay
+  const resProgreso = document.getElementById("res-progreso");
+  const resProgresoLabel = document.getElementById("res-progreso-label");
+
   const overlayTabs = document.querySelectorAll(".overlay-tab");
   const overlayPanels = {
     intro: document.getElementById("panel-intro"),
@@ -515,6 +680,9 @@
     fen: document.getElementById("panel-fen"),
     cred: document.getElementById("panel-cred")
   };
+  const overlay = document.getElementById("overlay");
+  const overlayClose = document.getElementById("overlay-close");
+  const overlayToggle = document.getElementById("overlay-toggle");
 
   overlayTabs.forEach(tab => {
     tab.addEventListener("click", () => {
@@ -526,6 +694,16 @@
       });
       overlayPanels[tabId].classList.remove("hidden");
     });
+  });
+
+  overlayClose.addEventListener("click", () => {
+    overlay.style.display = "none";
+    overlayToggle.style.display = "block";
+  });
+
+  overlayToggle.addEventListener("click", () => {
+    overlay.style.display = "block";
+    overlayToggle.style.display = "none";
   });
 
   function linkSliderInput(slider, input, callback) {
@@ -544,8 +722,22 @@
   linkSliderInput(angleSlider, angleInput, v => angle = v * Math.PI / 180);
   linkSliderInput(speedSlider, speedInput, v => speed0 = v);
   linkSliderInput(massSlider, massInput, v => mass = v);
-  linkSliderInput(dragSlider, dragInput, v => drag = v);
+  linkSliderInput(dragSlider, dragInput, v => {
+    drag = v;
+    mediumSelect.value = "custom"; // pasa a "personalizado"
+  });
   linkSliderInput(dtSlider, dtInput, v => dt = v);
+
+  mediumSelect.addEventListener("change", () => {
+    const val = mediumSelect.value;
+    if (val !== "custom") {
+      const c = parseFloat(val);
+      drag = c;
+      dragSlider.value = c;
+      dragInput.value = c;
+      updateLabels();
+    }
+  });
 
   function updateLabels() {
     angleValue.textContent = angleInput.value;
@@ -556,11 +748,51 @@
   }
   updateLabels();
 
+  function updateEnergyTable() {
+    const tbody = document.querySelector("#energy-table tbody");
+    tbody.innerHTML = "";
+    const start = Math.max(0, energyHistory.length - 40);
+    for (let i = start; i < energyHistory.length; i++) {
+      const e = energyHistory[i];
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${e.t.toFixed(2)}</td>` +
+        `<td>${e.Ec.toFixed(2)}</td>` +
+        `<td>${e.Ep.toFixed(2)}</td>` +
+        `<td>${e.Et.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function updateInfo(Ec, Ep, Et) {
+    const vMag = Math.sqrt(vx * vx + vy * vy);
+
+    infoT.textContent = t.toFixed(2) + " s";
+    infoPos.textContent = `x = ${x.toFixed(2)} m, y = ${y.toFixed(2)} m`;
+    infoVel.textContent =
+      `|v| = ${vMag.toFixed(2)} m/s (vₓ = ${vx.toFixed(2)}, vᵧ = ${vy.toFixed(2)})`;
+    infoEc.textContent = Ec.toFixed(2) + " J";
+    infoEp.textContent = Ep.toFixed(2) + " J";
+    infoEt.textContent = Et.toFixed(2) + " J";
+  }
+
+  function updateResultsPanel() {
+    resAltura.textContent = maxHeight.toFixed(2) + " m";
+    resAlcance.textContent = rangeX.toFixed(2) + " m";
+    resTiempo.textContent = flightTime.toFixed(2) + " s";
+
+    // Actualiza también el "progreso" temporal
+    let maxForSlider = flightTime > 0 ? flightTime : Math.max(1, t);
+    resProgreso.max = maxForSlider;
+    resProgreso.value = t;
+    resProgresoLabel.textContent = t.toFixed(2) + " s";
+  }
+
   // Resetear simulación
   function resetSimulation() {
     t = 0;
     x = 0;
-    y = launchHeight;
+    y = 0;
 
     const angDeg = parseFloat(angleInput.value);
     angle = angDeg * Math.PI / 180;
@@ -572,43 +804,36 @@
     vx = speed0 * Math.cos(angle);
     vy = speed0 * Math.sin(angle);
     trail.length = 0;
+    energyHistory.length = 0;
     running = false;
 
-    maxHeight = launchHeight;
+    maxHeight = 0;
     rangeX = 0;
     flightTime = 0;
-    updateResultsPanel();
 
-    startBtn.textContent = "Iniciar";
-    updateInfo();
-    drawScene();
-  }
-
-  function updateInfo() {
-    const v = Math.sqrt(vx * vx + vy * vy);
-    const Ec = 0.5 * mass * v * v;
+    const vMag = Math.sqrt(vx * vx + vy * vy);
+    const Ec = 0.5 * mass * vMag * vMag;
     const Ep = mass * G * y;
     const Et = Ec + Ep;
 
-    infoT.textContent = t.toFixed(2) + " s";
-    infoPos.textContent = `${x.toFixed(2)} m, ${y.toFixed(2)} m`;
-    infoVel.textContent = v.toFixed(2) + " m/s";
-    infoEt.textContent = Et.toFixed(2) + " J";
-  }
+    // Inicializamos máximos de energía con el primer valor
+    maxEcSeen = Math.max(Ec, 1);
+    maxEpSeen = Math.max(Math.abs(Ep), 1);
 
-  function updateResultsPanel() {
-    resAltura.textContent = maxHeight.toFixed(2) + " m";
-    resAlcance.textContent = rangeX.toFixed(2) + " m";
-    resTiempo.textContent = flightTime.toFixed(2) + " s";
+    energyHistory.push({ t, Ec, Ep, Et });
+    updateEnergyTable();
+    updateInfo(Ec, Ep, Et);
+    updateResultsPanel();
+    drawScene();
   }
 
   function stepSimulation() {
-    const v = Math.sqrt(vx * vx + vy * vy);
+    const vMag = Math.sqrt(vx * vx + vy * vy);
     let ax = 0;
     let ay = -G;
-    if (v > 0) {
-      ax = -(drag / mass) * vx * v;
-      ay = -G - (drag / mass) * vy * v;
+    if (vMag > 0) {
+      ax = -(drag / mass) * vx * vMag;
+      ay = -G - (drag / mass) * vy * vMag;
     }
 
     vx += ax * dt;
@@ -619,32 +844,49 @@
 
     if (y > maxHeight) maxHeight = y;
 
-    if (y <= 0 && t > 0) {
-      y = 0;
+    // impacto con el suelo: y = -launchHeight
+    if (y <= -launchHeight && t > 0 && vy < 0) {
+      y = -launchHeight;
       running = false;
       startBtn.textContent = "Iniciar";
       rangeX = x;
       flightTime = t;
-      updateResultsPanel();
     }
 
-    // Guardamos también t, vx y vy para el CSV
+    const Ec = 0.5 * mass * vMag * vMag;
+    const Ep = mass * G * y;
+    const Et = Ec + Ep;
+
+    // Actualizar máximos de energía para escalar vectores
+    if (!isNaN(Ec)) maxEcSeen = Math.max(maxEcSeen, Ec);
+    if (!isNaN(Ep)) maxEpSeen = Math.max(maxEpSeen, Math.abs(Ep));
+
+    // Guardamos datos para CSV
     trail.push({ t, x, y, vx, vy });
     if (trail.length > 800) trail.shift();
 
-    updateInfo();
+    energyHistory.push({ t, Ec, Ep, Et });
+    if (energyHistory.length > 400) energyHistory.shift();
+
+    updateEnergyTable();
+    updateInfo(Ec, Ep, Et);
+    updateResultsPanel();
   }
 
-  // Conversión mundo → pantalla
-  // Estos márgenes colocan el origen (x=0, y=0) cerca del niño.
-  function worldToScreen(wx, wy, width, height, maxX, maxY) {
-    const marginLeft = 160;  // mueve todo hacia la derecha (mano del niño)
-    const marginBottom = 90; // sube o baja la pelota respecto al suelo
+  // Conversión mundo → pantalla (y puede ser negativo)
+  function worldToScreen(wx, wy, width, height, maxX, maxY, minY) {
+    const marginLeft = 150;   // más a la derecha para que no salga de la boca
+    const marginBottom = 90;
     const marginRight = 30;
     const marginTop = 40;
 
-    const sx = marginLeft + (wx / maxX) * (width - marginLeft - marginRight);
-    const sy = height - marginBottom - (wy / maxY) * (height - marginTop - marginBottom);
+    const worldHeight = maxY - minY || 1;
+
+    const sx = marginLeft + (wx / Math.max(maxX, 1)) * (width - marginLeft - marginRight);
+    const sy =
+      height - marginBottom -
+      ((wy - minY) / worldHeight) * (height - marginTop - marginBottom);
+
     return [sx, sy];
   }
 
@@ -664,24 +906,51 @@
       ctx.fillRect(0, 0, w, h);
     }
 
+    // Límites del mundo (aumentados para que no se estrelle arriba)
     let maxX = 40;
     let maxY = 20;
+    let minY = -launchHeight; // suelo
+
+    const rangeNoDrag = (speed0 * speed0 * Math.sin(2 * angle)) / G;
+    const hNoDrag = (speed0 * speed0 * Math.sin(angle) * Math.sin(angle)) / (2 * G);
+
+    if (!isNaN(rangeNoDrag) && rangeNoDrag > 0) {
+      maxX = Math.max(maxX, rangeNoDrag * 1.5);
+    }
+    if (!isNaN(hNoDrag) && hNoDrag > 0) {
+      maxY = Math.max(maxY, hNoDrag * 1.5);
+    }
+
     trail.forEach(p => {
       if (p.x > maxX) maxX = p.x;
       if (p.y > maxY) maxY = p.y;
+      if (p.y < minY) minY = p.y;
     });
-    maxX = Math.max(maxX, 20);
-    maxY = Math.max(maxY, 10);
 
-    // línea de suelo
+    maxX = Math.max(maxX, 20);
+    maxY = Math.max(maxY, 5);
+    minY = Math.min(minY, -launchHeight);
+
+    // línea de suelo (y = -launchHeight)
     ctx.strokeStyle = "rgba(255,255,255,0.4)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    const [gx1, gy] = worldToScreen(0, 0, w, h, maxX, maxY);
-    const [gx2, gy2] = worldToScreen(maxX * 1.05, 0, w, h, maxX, maxY);
+    const [gx1, gy] = worldToScreen(0, -launchHeight, w, h, maxX, maxY, minY);
+    const [gx2, gy2] = worldToScreen(maxX * 1.05, -launchHeight, w, h, maxX, maxY, minY);
     ctx.moveTo(gx1, gy);
     ctx.lineTo(gx2, gy2);
     ctx.stroke();
+
+    // ejes de referencia en (0,0)
+    const [ox, oy] = worldToScreen(0, 0, w, h, maxX, maxY, minY);
+    // Eje x
+    drawArrow(ox, oy, ox + 60, oy, "rgba(200,200,255,0.7)");
+    ctx.fillStyle = "rgba(220,220,255,0.9)";
+    ctx.font = "11px system-ui";
+    ctx.fillText("x", ox + 65, oy + 4);
+    // Eje y
+    drawArrow(ox, oy, ox, oy - 60, "rgba(200,200,255,0.7)");
+    ctx.fillText("y", ox - 10, oy - 65);
 
     // trayectoria
     if (trail.length > 1) {
@@ -689,7 +958,7 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i = 0; i < trail.length; i++) {
-        const [sx, sy] = worldToScreen(trail[i].x, trail[i].y, w, h, maxX, maxY);
+        const [sx, sy] = worldToScreen(trail[i].x, trail[i].y, w, h, maxX, maxY, minY);
         if (i === 0) ctx.moveTo(sx, sy);
         else ctx.lineTo(sx, sy);
       }
@@ -697,7 +966,7 @@
     }
 
     // pelota
-    const [px, py] = worldToScreen(x, y, w, h, maxX, maxY);
+    const [px, py] = worldToScreen(x, y, w, h, maxX, maxY, minY);
     const speed = Math.sqrt(vx * vx + vy * vy);
 
     const glow = Math.min(10 + speed * 0.3, 30);
@@ -713,27 +982,46 @@
     // vector velocidad
     const vScale = 0.12;
     const vxPix = vx * vScale * (w / maxX);
-    const vyPix = -vy * vScale * (h / maxY);
+    const vyPix = -vy * vScale * (h / (maxY - minY));
     drawArrow(px, py, px + vxPix, py + vyPix, "#00ffb7");
 
     // vector aceleración
-    const v = Math.sqrt(vx * vx + vy * vy);
+    const vMag = Math.sqrt(vx * vx + vy * vy);
     let ax = 0, ay = -G;
-    if (v > 0) {
-      ax = -(drag / mass) * vx * v;
-      ay = -G - (drag / mass) * vy * v;
+    if (vMag > 0) {
+      ax = -(drag / mass) * vx * vMag;
+      ay = -G - (drag / mass) * vy * vMag;
     }
     const aScale = 0.3;
     const axPix = ax * aScale * (w / maxX);
-    const ayPix = -ay * aScale * (h / maxY);
+    const ayPix = -ay * aScale * (h / (maxY - minY));
     drawArrow(px, py, px + axPix, py + ayPix, "#ff5b5b");
+
+    // vectores de energía (E_c y E_p)
+    const EcCurrent = 0.5 * mass * speed * speed;
+    const EpCurrent = mass * G * y;
+
+    // Normalizamos respecto al máximo visto para que se noten los cambios
+    const ecNorm = maxEcSeen > 0 ? EcCurrent / maxEcSeen : 0;
+    const epNorm = maxEpSeen > 0 ? Math.abs(EpCurrent) / maxEpSeen : 0;
+
+    // Longitud entre 10 y 70 px
+    const ecLen = 10 + 60 * Math.max(0, Math.min(ecNorm, 1));
+    const epLen = 10 + 60 * Math.max(0, Math.min(epNorm, 1));
+
+    // Flecha de energía cinética (horizontal, a la derecha)
+    drawArrow(px, py, px + ecLen, py, "#ffd700");
+
+    // Flecha de energía potencial (vertical, hacia arriba si Ep>0, hacia abajo si Ep<0)
+    const dir = EpCurrent >= 0 ? -1 : 1; // -1 arriba, 1 abajo en pantalla
+    drawArrow(px, py, px, py + dir * epLen, "#9b59b6");
   }
 
   function drawArrow(x1, y1, x2, y2, color) {
     const headLength = 10;
     const dx = x2 - x1;
     const dy = y2 - y1;
-    const angle = Math.atan2(dy, dx);
+    const angleArrow = Math.atan2(dy, dx);
 
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
@@ -747,12 +1035,12 @@
     ctx.beginPath();
     ctx.moveTo(x2, y2);
     ctx.lineTo(
-      x2 - headLength * Math.cos(angle - Math.PI / 6),
-      y2 - headLength * Math.sin(angle - Math.PI / 6)
+      x2 - headLength * Math.cos(angleArrow - Math.PI / 6),
+      y2 - headLength * Math.sin(angleArrow - Math.PI / 6)
     );
     ctx.lineTo(
-      x2 - headLength * Math.cos(angle + Math.PI / 6),
-      y2 - headLength * Math.sin(angle + Math.PI / 6)
+      x2 - headLength * Math.cos(angleArrow + Math.PI / 6),
+      y2 - headLength * Math.sin(angleArrow + Math.PI / 6)
     );
     ctx.closePath();
     ctx.fill();
@@ -782,6 +1070,8 @@
   function loop() {
     if (running) {
       stepSimulation();
+    } else {
+      resProgresoLabel.textContent = t.toFixed(2) + " s";
     }
     drawScene();
     requestAnimationFrame(loop);
@@ -798,7 +1088,13 @@
   });
 
   resetBtn.addEventListener("click", () => {
+    startBtn.textContent = "Iniciar";
     resetSimulation();
+  });
+
+  // Slider de resultados: de momento solo visual
+  resProgreso.addEventListener("input", () => {
+    resProgresoLabel.textContent = parseFloat(resProgreso.value).toFixed(2) + " s";
   });
 
   resetSimulation();
