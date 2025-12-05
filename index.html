@@ -128,6 +128,17 @@
       grid-template-columns: 1fr 1fr;
       gap: 4px 12px;
       margin-bottom: 4px;
+      max-height: 230px;      /* hace el panel desplazable */
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .info-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    .info-panel::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
     }
 
     .info-label {
@@ -375,6 +386,26 @@
       </div>
     </div>
 
+    <!-- OPCIÓN: mostrar / ocultar vectores -->
+    <div class="control-group">
+      <h2>Mostrar vectores</h2>
+
+      <label style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
+        <span>Velocidad</span>
+        <input id="show-vel" type="checkbox" checked>
+      </label>
+
+      <label style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
+        <span>Aceleración</span>
+        <input id="show-acc" type="checkbox" checked>
+      </label>
+
+      <label style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
+        <span>Energías (E<sub>c</sub>, E<sub>p</sub>)</span>
+        <input id="show-energy-vectors" type="checkbox" checked>
+      </label>
+    </div>
+
     <!-- Botones -->
     <div class="buttons">
       <button id="start-btn">Iniciar</button>
@@ -617,6 +648,11 @@
   let maxEcSeen = 1;
   let maxEpSeen = 1;
 
+  // switches de visibilidad de vectores
+  let showVel = true;
+  let showAcc = true;
+  let showEnergyVectors = true;
+
   // Imagen de fondo
   const bgImage = new Image();
   let bgLoaded = false;
@@ -737,6 +773,17 @@
       dragInput.value = c;
       updateLabels();
     }
+  });
+
+  // listeners de los checkboxes de vectores
+  document.getElementById("show-vel").addEventListener("change", e => {
+    showVel = e.target.checked;
+  });
+  document.getElementById("show-acc").addEventListener("change", e => {
+    showAcc = e.target.checked;
+  });
+  document.getElementById("show-energy-vectors").addEventListener("change", e => {
+    showEnergyVectors = e.target.checked;
   });
 
   function updateLabels() {
@@ -983,7 +1030,9 @@
     const vScale = 0.12;
     const vxPix = vx * vScale * (w / maxX);
     const vyPix = -vy * vScale * (h / (maxY - minY));
-    drawArrow(px, py, px + vxPix, py + vyPix, "#00ffb7");
+    if (showVel) {
+      drawArrow(px, py, px + vxPix, py + vyPix, "#00ffb7");
+    }
 
     // vector aceleración
     const vMag = Math.sqrt(vx * vx + vy * vy);
@@ -995,7 +1044,9 @@
     const aScale = 0.3;
     const axPix = ax * aScale * (w / maxX);
     const ayPix = -ay * aScale * (h / (maxY - minY));
-    drawArrow(px, py, px + axPix, py + ayPix, "#ff5b5b");
+    if (showAcc) {
+      drawArrow(px, py, px + axPix, py + ayPix, "#ff5b5b");
+    }
 
     // vectores de energía (E_c y E_p)
     const EcCurrent = 0.5 * mass * speed * speed;
@@ -1009,12 +1060,14 @@
     const ecLen = 10 + 60 * Math.max(0, Math.min(ecNorm, 1));
     const epLen = 10 + 60 * Math.max(0, Math.min(epNorm, 1));
 
-    // Flecha de energía cinética (horizontal, a la derecha)
-    drawArrow(px, py, px + ecLen, py, "#ffd700");
+    if (showEnergyVectors) {
+      // Flecha de energía cinética (horizontal, a la derecha)
+      drawArrow(px, py, px + ecLen, py, "#ffd700");
 
-    // Flecha de energía potencial (vertical, hacia arriba si Ep>0, hacia abajo si Ep<0)
-    const dir = EpCurrent >= 0 ? -1 : 1; // -1 arriba, 1 abajo en pantalla
-    drawArrow(px, py, px, py + dir * epLen, "#9b59b6");
+      // Flecha de energía potencial (vertical, arriba si Ep>0, abajo si Ep<0)
+      const dir = EpCurrent >= 0 ? -1 : 1; // -1 arriba, 1 abajo en pantalla
+      drawArrow(px, py, px, py + dir * epLen, "#9b59b6");
+    }
   }
 
   function drawArrow(x1, y1, x2, y2, color) {
